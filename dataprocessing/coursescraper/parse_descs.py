@@ -1,0 +1,272 @@
+"""parse_descs.py
+
+Parses course information from course description pages on
+http://coursecatalog.web.cmu.edu/ into an object.
+
+Attributes:
+    DESC_URL (str): String of URL containing course details.
+
+Aditya Pillai (apillai@andrew.cmu.edu)
+2019-03-10
+"""
+
+
+import urllib.request
+import urllib.parse
+import re
+import bs4
+
+
+# String constants
+DESC_URL = "https://enr-apps.as.cmu.edu/open/SOC/SOCServlet/courseDetails"
+
+
+def create_reqs_obj(reqs):
+    """create_reqs_obj
+    
+    Creates an object representation of the given prerequisites/corequisites.
+
+    Args:
+        reqs (str): A string of required prerequisites/corequisites.
+    
+    Returns:
+        Object: 
+        {
+            'invert': Bool indicating whether the representation is inverted,
+            'reqs_list'L: List representation of the pre/corequisites,
+        }
+    """
+
+    def is_inverted(reqs):
+        """Determines whether the data structure should be inverted by using
+        regex to determine whether the expression "(xx-xxx and xx-xxx" is
+        present; the x's reprseent any digit 0-9.
+        """
+
+        groups = re.findall(r'\((\d{2})(-)(\d{3}) and (\d{2})(-)(\d{3})', reqs)
+        return len(groups) > 0
+
+
+    def split_course_list(reqs, conj):
+        """Creates a list from a string by splitting it at the given conjunction
+        and then formats the list by removing whitespace and parentheses around
+        each list element
+        
+        Args:
+            reqs (TYPE): Description
+            conj (TYPE): Description
+        
+        Returns:
+            TYPE: Description
+        """
+
+        split_list = reqs.split(conj)
+        formatted_list = []
+        for item in split_list:
+            formatted_item = item.strip().strip('()')
+            formatted_list.append(formatted_item)
+        return formatted_list
+
+    def create_reqs_list(reqs, conj):
+        """Creates a 2-dimensional list given the reqs string and the principal
+        conjunction.
+        """
+
+        # Separates the requisites into course groups by the given conjunction
+        course_groups = split_course_list(reqs, conj)
+        anti_conj = 'or' if conj == 'and' else 'and'
+        reqs_list = []
+
+        for course_group in course_groups:
+            inner_list = []
+            courses = split_course_list(course_group, anti_conj)
+
+            for course in courses:
+                formatted_str = course.strip()
+                inner_list.append(formatted_str)
+
+            reqs_list.append(inner_list)
+
+        return reqs_list
+
+    if reqs == '' or reqs is None:
+        invert = None
+        reqs_list = None
+    elif is_inverted(reqs):
+        invert = True
+        reqs_list = create_reqs_list(reqs, 'or')
+    else:
+        invert = False
+        reqs_list = create_reqs_list(reqs, 'and')
+    return {'invert': invert, 'reqs_list': reqs_list}
+
+
+# @function parse_reqs
+# @brief Parses out the prerequisites and corequisites of a course from the
+#        HTML of the search app.
+# @param soup BeautifulSoup of the page's HTML.
+# @return (prereqs, coreqs)
+def parse_reqs(soup):
+    """parse_reqs
+
+    Parses out the prerequisites and corequisites of a course from the HTML of
+    the search app.
+    
+    Args:
+        soup (BeautifulSoup): BeautifulSoup of the page's HTML
+    
+    Returns:
+        (prereqs, coreqs): Tuple of prerequisites and corequisites
+    """
+
+    def correct_course(num):
+        """Regex replacement function
+        """
+        num = num.group(0)
+        return num[:2] + '-' + num[2:]
+
+    # Find text
+    prereqs = soup.find(string='Prerequisites').parent.parent.dd.string
+    coreqs = soup.find(string='Corequisites').parent.parent.dd.string
+
+    # Remove extra whitespace
+    prereqs = ' '.join(prereqs.split())
+    coreqs = ' '.join(coreqs.split())
+
+    # Add dashes to course numbers
+    prereqs = re.sub(r'(\d{5})', correct_course, str(prereqs))
+    coreqs = re.sub(r'(\d{5})', correct_course, str(coreqs))
+
+    # Replace commas with "or" (seems to be an error in their system)
+    prereqs = re.sub(',', 'or', str(prereqs))
+    coreqs = re.sub(',', 'or', str(coreqs))
+
+    # Return null if no pre/corequisites
+    if prereqs == 'None':
+        prereqs = None
+    if coreqs == 'None':
+        coreqs = None
+
+    return (prereqs, coreqs)
+
+
+
+def parse_full_names(soup):
+    """parse_full_names
+    
+    Obtains full names of instructors.
+
+    Args:
+        soup (BeautifulSoup): BeautifulSoup of the page's HTML.
+    
+    Returns:
+        {<section>: [<name>]}: Dictionary of list of names
+    """
+
+    dict_of_names = {}
+
+    # Determine the column for Section.
+    # Usually, column=2 for S(spring) and F(fall) and column=3 for M(summer).
+    column = 2
+    try:
+        thtags = soup.find_all('table', class_='table-striped')[0]\
+            .select('thead > tr > th')
+
+        for i in range(len(thtags)):
+            if thtags[i].text == 'Section':
+                break
+        column = i
+    except:
+        pass
+
+    # Parse the names from the web page.
+    try:
+        for ultag in soup.find_all('ul', class_='instructor'):
+            # Get the section this list of names belongs to
+            section = ultag.parent.parent.find_all('td', recursive=False)[column]\
+                .text.strip()
+
+            # Put all the names into a list
+            names = [litag.text for litag in ultag.find_all('li')]
+            if names == []:
+                names = ['Instructor TBA']
+            if section:
+                dict_of_names[section] = names
+
+        # Fix the discrepancy between SOC table and the SOC api
+        # if there's only one lecture, then
+        # dict_of_names['Lec'] is dict_of_names['Lec 1']
+        if 'Lec 1' in dict_of_names:
+            dict_of_names['Lec'] = dict_of_names['Lec 1']
+    except TypeError:
+        pass
+
+    return dict_of_names
+
+
+
+def get_page(url):
+    """get_page
+    
+    Args:
+        url (str): URL of the page to get.
+    
+    Returns:
+        BeautifulSoup HTML Object or None: HTML object is successful, None
+        otherwise.
+    """
+    try:
+        response = urllib.request.urlopen(url)
+    except (urllib.request.URLError, ValueError):
+        return None
+
+    return bs4.BeautifulSoup(response.read(), 'html.parser')
+
+
+
+def get_course_desc(num, semester, year):
+    """get_course_desc
+
+    Returns the description, coreqs, and prereqs for a course.
+    
+    Args:
+        num (str): course number as a 5 character string, no dash
+        semester (string): semester to lookup (S, F, or M for spring, fall, or
+        summer, respectively)
+        year (str): Two digit year (for example, 2019 is 19)
+    
+    Returns:
+        JSON: {
+            'desc': Course description,
+            'prereqs': Course prerequisites,
+            'prereqs_obj': Prerequisites as an object,
+            'coreqs': Course corequisites,
+            'coreqs_obj': Corequisites as an object,
+        }
+    """
+    # Generate target URL
+    params = {
+        'COURSE': num,
+        'SEMESTER': semester + year
+    }
+    url = DESC_URL + '?' + urllib.parse.urlencode(params)
+
+    # Retrieve page
+    soup = get_page(url)
+
+    # Parse data
+    desc = soup.find(id='course-detail-description').p.string
+    (prereqs, coreqs) = parse_reqs(soup)
+    names_dict = parse_full_names(soup)
+
+    prereqs_obj = create_reqs_obj(prereqs)
+    coreqs_obj = create_reqs_obj(coreqs)
+
+    return {
+        'desc': desc,
+        'prereqs': prereqs,
+        'prereqs_obj': prereqs_obj,
+        'coreqs': coreqs,
+        'coreqs_obj': coreqs_obj,
+        'names_dict': names_dict
+    }
