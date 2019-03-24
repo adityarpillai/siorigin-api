@@ -11,11 +11,18 @@ router.get('/', (req, res) => {
 
 /* GET data about a specific course */
 router.get('/number/', (req, res) => {
-  const { courseNumber } = req.query;
+  let { courseNumber } = req.query;
+  courseNumber = courseNumber.replace(/[.,\/#!$%\^&\*;:{}=\-_`~() ]/g,"");
+  courseNumber = courseNumber.toLowerCase();
+
   let result = [];
   for (let i = 0; i < dataLength; i++) {
-    let curr = data[i]
-    if (curr['course_number'].includes(courseNumber))
+    let curr = data[i];
+    let c_num = curr['course_number'];
+    c_num = c_num.replace(/[.,\/#!$%\^&\*;:{}=\-_`~() ]/g,"");
+    c_num = c_num.toLowerCase();
+
+    if (c_num.includes(courseNumber))
       result.push(curr)
   }
   return res.json(result);
@@ -23,12 +30,20 @@ router.get('/number/', (req, res) => {
 
 /* GET data about a specific department */
 router.get('/department/', (req, res) => {
-  const { courseDepartment } = req.query;
+  let { courseDepartment } = req.query;
+  courseDepartment = courseDepartment.replace(/[.,\/#!$%\^&\*;:{}=\-_`~() ]/g,"")
+  courseDepartment = courseDepartment.toLowerCase();
+
   console.log("Department: " + courseDepartment)
   let result = [];
   for (let i = 0; i < dataLength; i++) {
     let curr = data[i]
-    if (curr['course_department'].includes(courseDepartment))
+    let c_dep = curr['course_department']
+    c_dep = c_dep.replace(/[.,\/#!$%\^&\*;:{}=\-_`~() ]/g,"");
+    c_dep = c_dep.toLowerCase();
+    console.log("Curr Dep: " + c_dep);
+
+    if (c_dep.includes(courseDepartment))
       result.push(curr)
   }
   return res.json(result);

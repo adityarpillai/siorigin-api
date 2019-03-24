@@ -7,7 +7,10 @@ const dataLength = data.length;
 
 /* GET courses with a specific instructor */
 router.get('/name/', (req, res) => {
-  const { instructorName } = req.query;
+  let { instructorName } = req.query;
+  instructorName = instructorName.replace(/[.,\/#!$%\^&\*;:{}=\-_`~() ]/g,"");
+  instructorName = instructorName.toLowerCase();
+
   let result = [];
   for (let i = 0; i < dataLength; i++) {
     let curr_course = data[i];
@@ -16,7 +19,10 @@ router.get('/name/', (req, res) => {
       let curr_section = curr_course['course_sections'][j]
       let l = curr_section['course_instructors'].length
       for (let k = 0; k < l; k++) {
-        if (curr_section['course_instructors'][k]['instructor_name'].includes(instructorName)) {
+        let i_name = curr_section['course_instructors'][k]['instructor_name'];
+        i_name = i_name.replace(/[.,\/#!$%\^&\*;:{}=\-_`~() ]/g,"");
+        i_name = i_name.toLowerCase();
+        if (i_name.includes(instructorName)) {
           result.push(curr_course);
           break course_section_loop;
         }
