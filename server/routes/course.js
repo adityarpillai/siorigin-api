@@ -34,14 +34,12 @@ router.get('/department/', (req, res) => {
   courseDepartment = courseDepartment.replace(/[.,\/#!$%\^&\*;:{}=\-_`~() ]/g,"")
   courseDepartment = courseDepartment.toLowerCase();
 
-  console.log("Department: " + courseDepartment)
   let result = [];
   for (let i = 0; i < dataLength; i++) {
     let curr = data[i]
     let c_dep = curr['course_department']
     c_dep = c_dep.replace(/[.,\/#!$%\^&\*;:{}=\-_`~() ]/g,"");
     c_dep = c_dep.toLowerCase();
-    console.log("Curr Dep: " + c_dep);
 
     if (c_dep.includes(courseDepartment))
       result.push(curr)
