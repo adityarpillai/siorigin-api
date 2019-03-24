@@ -16,7 +16,6 @@ router.get('/name/', (req, res) => {
       let curr_section = curr_course['course_sections'][j]
       let l = curr_section['course_instructors'].length
       for (let k = 0; k < l; k++) {
-        console.log("On " + curr_section['course_instructors'][k]['instructor_name'])
         if (curr_section['course_instructors'][k]['instructor_name'].includes(instructorName)) {
           result.push(curr_course);
           break course_section_loop;
